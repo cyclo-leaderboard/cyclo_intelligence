@@ -93,7 +93,7 @@ const getSavedAssignmentForRobot = (state, robotType) => {
   return hasAssignedTopic(saved) ? saved : null;
 };
 
-export default function ImageGrid({ isActive = true }) {
+export default function ImageGrid({ isActive = true, referenceOverlay = null }) {
   const dispatch = useDispatch();
   const store = useStore();
   const imageTopicList = useSelector((state) => state.ros.imageTopicList);
@@ -316,6 +316,8 @@ export default function ImageGrid({ isActive = true }) {
               onClose={handleCellClose}
               onPlusClick={handlePlusClick}
               isActive={isActive}
+              referenceImage={referenceOverlay?.enabled ? referenceOverlay.frames?.[asignedImageTopicList[idx]] : null}
+              referenceOpacity={referenceOverlay?.opacity ?? 0.4}
             />
             <div className={classTopicLabel}>{asignedImageTopicList[idx] || ''}</div>
           </div>

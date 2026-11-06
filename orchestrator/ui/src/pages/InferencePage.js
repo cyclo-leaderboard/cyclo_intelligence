@@ -22,6 +22,8 @@ import {
   MdKeyboardDoubleArrowLeft,
   MdKeyboardDoubleArrowRight,
   MdViewInAr,
+  MdLayers,
+  MdExpandMore,
 } from 'react-icons/md';
 import InferenceControlPanel from '../components/InferenceControlPanel';
 import HeartbeatStatus from '../components/HeartbeatStatus';
@@ -29,6 +31,7 @@ import InlineSystemStatus from '../components/InlineSystemStatus';
 import ImageGrid from '../components/ImageGrid';
 import RobotViewer3D from '../components/RobotViewer3D';
 import InferencePanel from '../components/InferencePanel';
+import ReferenceLayoutPanel from '../components/ReferenceLayoutPanel';
 import RecordTopicMonitor from '../components/RecordTopicMonitor';
 import { selectInferenceTaskInfo } from '../features/tasks/taskSlice';
 import { setIsFirstLoadFalse } from '../features/ui/uiSlice';
@@ -48,6 +51,8 @@ export default function InferencePage({ isActive = true }) {
 
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [show3DViewer, setShow3DViewer] = useState(true);
+  const [isReferenceLayoutOpen, setIsReferenceLayoutOpen] = useState(false);
+  const [referenceOverlay, setReferenceOverlay] = useState({ frames: {}, enabled: false, opacity: 0.4 });
 
   const isFirstLoad = useSelector((state) => state.ui.isFirstLoad.inference);
 
@@ -191,7 +196,7 @@ export default function InferencePage({ isActive = true }) {
             <div className={classHeartbeatStatus}>
               <HeartbeatStatus />
             </div>
-            <ImageGrid isActive={isActive} />
+            <ImageGrid isActive={isActive} referenceOverlay={referenceOverlay} />
           </div>
           <div className="flex-[4] min-h-[120px] flex flex-row items-center justify-center mx-1 gap-2 h-full relative">
             {show3DViewer && (
@@ -235,8 +240,35 @@ export default function InferencePage({ isActive = true }) {
             </span>
           </button>
           <div className={classRightPanel}>
-            <div className="w-full min-h-10"></div>
+            <div className="w-full h-10 shrink-0 flex items-center justify-end pr-4">
+              <button
+                type="button"
+                aria-expanded={isReferenceLayoutOpen}
+                aria-controls="reference-layout-panel"
+                onClick={() => setIsReferenceLayoutOpen((open) => !open)}
+                className={clsx(
+                  'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                  'focus:outline-none focus:ring-2 focus:ring-blue-400',
+                  isReferenceLayoutOpen
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                )}
+              >
+                <MdLayers size={16} aria-hidden="true" />
+                Reference layout
+                {referenceOverlay.enabled && <span className="h-1.5 w-1.5 rounded-full bg-blue-500" aria-label="active" />}
+                <MdExpandMore size={16} aria-hidden="true" className={clsx('transition-transform', isReferenceLayoutOpen && 'rotate-180')} />
+              </button>
+            </div>
             <InferencePanel />
+          </div>
+          <div
+            id="reference-layout-panel"
+            hidden={!isReferenceLayoutOpen || isRightPanelCollapsed}
+            className="absolute right-4 top-12 z-20 w-[calc(100%-2rem)] max-w-[350px] max-h-[calc(100%-4rem)] overflow-y-auto rounded-2xl shadow-xl"
+          >
+            <ReferenceLayoutPanel isActive={isActive} onOverlayChange={setReferenceOverlay}
+              onClose={() => setIsReferenceLayoutOpen(false)} />
           </div>
         </div>
       </div>

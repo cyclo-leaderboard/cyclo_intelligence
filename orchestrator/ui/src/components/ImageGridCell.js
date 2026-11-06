@@ -84,6 +84,8 @@ export default function ImageGridCell({
   onPlusClick,
   isActive = true,
   style = {},
+  referenceImage = null,
+  referenceOpacity = 0.4,
 }) {
   const normalizedRotationDegrees = normalizeRotationDegrees(rotationDegrees);
   const rotate = normalizedRotationDegrees !== 0;
@@ -94,12 +96,14 @@ export default function ImageGridCell({
   const currentImgRef = useRef(null);
   const isCreatingRef = useRef(false);
   const cancelRef = useRef(false);
+  const streamGenerationRef = useRef(0);
   const retryTimerRef = useRef(null);
   const retryCountRef = useRef(0);
   const MAX_RETRIES = 5;
 
   const destroyImage = useCallback(() => {
     // Signal any in-flight createImage waiting on the staggered delay to bail.
+    streamGenerationRef.current += 1;
     cancelRef.current = true;
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
@@ -126,6 +130,7 @@ export default function ImageGridCell({
 
     isCreatingRef.current = true;
     destroyImage();
+    const generation = streamGenerationRef.current;
     // Clear cancel flag raised by destroyImage; later destroys will set it again.
     cancelRef.current = false;
 
@@ -135,7 +140,7 @@ export default function ImageGridCell({
         await new Promise((resolve) => setTimeout(resolve, staggeredDelay));
       }
 
-      if (cancelRef.current || !topic || !topic.trim() || !isActive || !containerRef.current) return;
+      if (generation !== streamGenerationRef.current || cancelRef.current || !topic || !topic.trim() || !isActive || !containerRef.current) return;
 
       const img = document.createElement('img');
       const timestamp = Date.now();
@@ -149,7 +154,7 @@ export default function ImageGridCell({
       img.onerror = () => {
         // Late-fired error after destroyImage (src='' triggers onerror) must
         // not schedule a retry — cancelRef tells us we're already torn down.
-        if (cancelRef.current) return;
+        if (generation !== streamGenerationRef.current || cancelRef.current) return;
         if (retryCountRef.current >= MAX_RETRIES) {
           console.error(`Image stream failed after ${MAX_RETRIES} retries for idx ${idx}, topic: ${topic}`);
           return;
@@ -158,7 +163,7 @@ export default function ImageGridCell({
         const delay = Math.min(1000 * Math.pow(2, retryCountRef.current - 1), 8000);
         console.warn(`Image stream error for idx ${idx}, retrying in ${delay}ms (${retryCountRef.current}/${MAX_RETRIES})`);
         retryTimerRef.current = setTimeout(() => {
-          if (cancelRef.current) return;
+          if (generation !== streamGenerationRef.current || cancelRef.current) return;
           if (isActive && topic && containerRef.current) {
             destroyImage();
             isCreatingRef.current = false;
@@ -167,7 +172,7 @@ export default function ImageGridCell({
         }, delay);
       };
       img.onload = () => {
-        retryCountRef.current = 0;
+        if (generation === streamGenerationRef.current) retryCountRef.current = 0;
       };
 
       if (rotate) {
@@ -188,20 +193,20 @@ export default function ImageGridCell({
 
         wrapper.appendChild(img);
 
-        if (containerRef.current && !cancelRef.current) {
+        if (containerRef.current && generation === streamGenerationRef.current && !cancelRef.current) {
           containerRef.current.appendChild(wrapper);
           currentImgRef.current = wrapper;
         }
       } else {
         img.className = 'w-full h-full object-cover bg-gray-100';
 
-        if (containerRef.current && !cancelRef.current) {
+        if (containerRef.current && generation === streamGenerationRef.current && !cancelRef.current) {
           containerRef.current.appendChild(img);
           currentImgRef.current = img;
         }
       }
     } finally {
-      isCreatingRef.current = false;
+      if (generation === streamGenerationRef.current) isCreatingRef.current = false;
     }
   }, [
     topic,
@@ -266,6 +271,12 @@ export default function ImageGridCell({
       )}
       <div ref={containerRef} className="w-full h-full relative overflow-hidden rounded-3xl flex items-center justify-center">
         {(!topic || !isActive) && <div className="text-6xl text-gray-400 font-light">+</div>}
+        {referenceImage && <img
+          src={referenceImage}
+          alt="Dataset reference"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          style={{ zIndex: 2, opacity: referenceOpacity }}
+        />}
       </div>
     </div>
   );
